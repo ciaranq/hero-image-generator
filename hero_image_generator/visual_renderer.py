@@ -1,5 +1,5 @@
 from PIL import Image, ImageDraw
-from theme_detector import Theme
+from .theme_detector import Theme
 
 class VisualRenderer:
     """Renders theme-specific visual elements on hero images"""

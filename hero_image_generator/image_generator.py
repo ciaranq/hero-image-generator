@@ -1,8 +1,8 @@
 from PIL import Image, ImageDraw, ImageFont
 import os
-from theme_detector import ThemeDetector, Theme
-from subtitle_generator import SubtitleGenerator
-from visual_renderer import VisualRenderer
+from .theme_detector import ThemeDetector, Theme
+from .subtitle_generator import SubtitleGenerator
+from .visual_renderer import VisualRenderer
 
 class HeroImageGenerator:
     """Generate hero images for blog posts"""
