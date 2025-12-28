@@ -1,6 +1,4 @@
-import sys
-sys.path.insert(0, 'scripts')
-from theme_detector import ThemeDetector, Theme
+from hero_image_generator.theme_detector import ThemeDetector, Theme
 
 def test_detect_ai_ml_theme():
     detector = ThemeDetector()

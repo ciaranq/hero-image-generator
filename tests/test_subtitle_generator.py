@@ -1,6 +1,4 @@
-import sys
-sys.path.insert(0, 'scripts')
-from subtitle_generator import SubtitleGenerator
+from hero_image_generator.subtitle_generator import SubtitleGenerator
 
 def test_generate_ai_subtitle():
     gen = SubtitleGenerator()

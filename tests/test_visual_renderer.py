@@ -1,8 +1,6 @@
-import sys
-sys.path.insert(0, 'scripts')
 from PIL import Image
-from visual_renderer import VisualRenderer
-from theme_detector import Theme
+from hero_image_generator.visual_renderer import VisualRenderer
+from hero_image_generator.theme_detector import Theme
 
 def test_render_returns_image():
     renderer = VisualRenderer()

@@ -1,7 +1,4 @@
-import sys
-sys.path.insert(0, 'scripts')
-
-from image_generator import HeroImageGenerator
+from hero_image_generator.image_generator import HeroImageGenerator
 
 def test_single_image():
     """Test generating a single hero image"""
