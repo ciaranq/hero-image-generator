@@ -97,22 +97,16 @@ class WizardRunner:
     def _collect_customizations(self) -> None:
         """Collect color and font customizations."""
         # Accent color
-        self.config['accent_color'] = self.prompter.prompt_color(
-            "Accent color",
-            tuple(self.config['accent_color'])
-        )
+        print("\nAccent color:")
+        self.config['accent_color'] = self.prompter.prompt_color()
 
         # Gradient colors
         customize_gradient = input("\nCustomize gradient? (y/n) [n]: ").strip().lower()
         if customize_gradient in ['y', 'yes']:
-            self.config['gradient_start'] = self.prompter.prompt_color(
-                "Gradient start",
-                tuple(self.config['gradient_start'])
-            )
-            self.config['gradient_end'] = self.prompter.prompt_color(
-                "Gradient end",
-                tuple(self.config['gradient_end'])
-            )
+            print("\nGradient start color:")
+            self.config['gradient_start'] = self.prompter.prompt_color()
+            print("\nGradient end color:")
+            self.config['gradient_end'] = self.prompter.prompt_color()
 
         # Font sizes
         customize_fonts = input("\nCustomize font sizes? (y/n) [n]: ").strip().lower()
@@ -133,17 +127,26 @@ class WizardRunner:
         # Title font
         title_size = input(f"Title font size [{self.config['title_font_size']}]: ").strip()
         if title_size:
-            self.config['title_font_size'] = int(title_size)
+            try:
+                self.config['title_font_size'] = int(title_size)
+            except ValueError:
+                print("⚠️  Invalid font size, keeping current value")
 
         # Subtitle font
         subtitle_size = input(f"Subtitle font size [{self.config['subtitle_font_size']}]: ").strip()
         if subtitle_size:
-            self.config['subtitle_font_size'] = int(subtitle_size)
+            try:
+                self.config['subtitle_font_size'] = int(subtitle_size)
+            except ValueError:
+                print("⚠️  Invalid font size, keeping current value")
 
         # Year font
         year_size = input(f"Year badge font size [{self.config['year_font_size']}]: ").strip()
         if year_size:
-            self.config['year_font_size'] = int(year_size)
+            try:
+                self.config['year_font_size'] = int(year_size)
+            except ValueError:
+                print("⚠️  Invalid font size, keeping current value")
 
     def _generate_and_preview(self) -> None:
         """Generate image and show preview."""
@@ -151,9 +154,24 @@ class WizardRunner:
         temp_filename = "temp-preview.png"
 
         print(f"\n⏳ Generating image...")
+
+        # Use theme override if set, otherwise use original tags
+        tags_to_use = self.tags
+        if self.theme_override:
+            # Map theme name to a tag that will trigger that theme
+            theme_tag_map = {
+                'ai_ml': 'ai',
+                'seo_analytics': 'seo',
+                'automation': 'automation',
+                'strategy': 'strategy',
+                'default': 'default'
+            }
+            # Use the theme override tag to force the theme
+            tags_to_use = [theme_tag_map.get(self.theme_override, 'ai')]
+
         self.output_path = self.generator.generate(
             self.title,
-            self.tags,
+            tags_to_use,
             self.year,
             temp_filename
         )
@@ -166,32 +184,52 @@ class WizardRunner:
     def _handle_refinement(self, choice: str) -> None:
         """Handle refinement menu choice."""
         if choice == '1':
+            # Change title
             self.title = self.prompter.prompt_title()
         elif choice == '2':
+            # Change tags
             self.tags = self.prompter.prompt_tags()
             theme = self.theme_detector.get_theme(self.tags)
             print(f"✓ Detected theme: {theme.name.replace('_', '/').upper()}")
         elif choice == '3':
+            # Change year
             self.year = self.prompter.prompt_year(self.year)
         elif choice == '4':
-            print("\n[1] ai_ml  [2] seo_analytics  [3] automation  [4] strategy  [5] default")
-            # TODO: Implement theme override
+            # Change accent color
+            print("\nAccent color:")
+            self.config['accent_color'] = self.prompter.prompt_color()
         elif choice == '5':
-            self.config['accent_color'] = self.prompter.prompt_color(
-                "Accent color",
-                tuple(self.config['accent_color'])
-            )
+            # Change gradient colors
+            print("\nGradient start color:")
+            self.config['gradient_start'] = self.prompter.prompt_color()
+            print("\nGradient end color:")
+            self.config['gradient_end'] = self.prompter.prompt_color()
         elif choice == '6':
-            self.config['gradient_start'] = self.prompter.prompt_color(
-                "Gradient start",
-                tuple(self.config['gradient_start'])
-            )
-            self.config['gradient_end'] = self.prompter.prompt_color(
-                "Gradient end",
-                tuple(self.config['gradient_end'])
-            )
-        elif choice == '7':
+            # Adjust font sizes
             self._collect_font_sizes()
+        elif choice == '7':
+            # Override theme
+            print("\nSelect theme:")
+            print("  1. AI/ML (Purple)")
+            print("  2. SEO/Analytics (Green)")
+            print("  3. Automation (Orange)")
+            print("  4. Strategy (Cyan)")
+            print("  5. Default")
+
+            theme_choice = input("Enter choice (1-5): ").strip()
+            theme_map = {
+                '1': 'ai_ml',
+                '2': 'seo_analytics',
+                '3': 'automation',
+                '4': 'strategy',
+                '5': 'default'
+            }
+
+            if theme_choice in theme_map:
+                self.theme_override = theme_map[theme_choice]
+                print(f"✓ Theme override set to: {self.theme_override.replace('_', '/').upper()}")
+            else:
+                print("⚠️  Invalid choice, no theme override applied")
 
     def _slugify(self, text: str) -> str:
         """Convert text to filename-safe slug."""
@@ -218,11 +256,25 @@ class WizardRunner:
         # Prompt for output directory
         output_dir = self.preview_manager.prompt_output_directory('public/images')
 
+        # Use theme override if set, otherwise use original tags
+        tags_to_use = self.tags
+        if self.theme_override:
+            # Map theme name to a tag that will trigger that theme
+            theme_tag_map = {
+                'ai_ml': 'ai',
+                'seo_analytics': 'seo',
+                'automation': 'automation',
+                'strategy': 'strategy',
+                'default': 'default'
+            }
+            # Use the theme override tag to force the theme
+            tags_to_use = [theme_tag_map.get(self.theme_override, 'ai')]
+
         # Generate final image
         self.generator.output_dir = output_dir
         final_path = self.generator.generate(
             self.title,
-            self.tags,
+            tags_to_use,
             self.year,
             filename
         )
