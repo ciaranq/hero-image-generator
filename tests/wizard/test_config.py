@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 import tempfile
 import json
@@ -24,6 +25,37 @@ def test_get_config_path_ends_with_last_used_json():
     manager = ConfigManager()
     path = manager.get_config_path()
     assert path.name == 'last-used.json'
+
+
+def test_get_config_path_windows(monkeypatch):
+    """Windows should use APPDATA environment variable"""
+    manager = ConfigManager()
+
+    # Mock Windows platform and APPDATA
+    monkeypatch.setattr(sys, 'platform', 'win32')
+    monkeypatch.setenv('APPDATA', r'C:\Users\TestUser\AppData\Roaming')
+
+    path = manager.get_config_path()
+
+    assert 'AppData' in str(path) or 'APPDATA' in str(path).upper()
+    assert path.name == 'last-used.json'
+    assert 'hero-image-generator' in str(path)
+
+
+def test_get_config_path_windows_fallback(monkeypatch):
+    """Windows without APPDATA should fallback to home directory"""
+    manager = ConfigManager()
+
+    # Mock Windows platform without APPDATA
+    monkeypatch.setattr(sys, 'platform', 'win32')
+    monkeypatch.delenv('APPDATA', raising=False)
+
+    path = manager.get_config_path()
+
+    # Should still return a valid Path object
+    assert isinstance(path, Path)
+    assert path.name == 'last-used.json'
+    assert 'hero-image-generator' in str(path)
 
 
 def test_load_returns_defaults_when_file_missing(tmp_path, monkeypatch):

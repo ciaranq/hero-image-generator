@@ -19,7 +19,7 @@ class ConfigManager:
         """
         if sys.platform == 'win32':
             # Windows: %APPDATA%/hero-image-generator/last-used.json
-            base = Path(os.environ.get('APPDATA', '~'))
+            base = Path(os.environ.get('APPDATA', str(Path.home())))
         else:
             # Linux/macOS: ~/.config/hero-image-generator/last-used.json
             base = Path.home() / '.config'
