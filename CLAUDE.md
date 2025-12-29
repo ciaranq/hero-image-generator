@@ -29,6 +29,15 @@ pytest tests/ --cov=hero_image_generator --cov-report=html
 pytest tests/test_theme_detector.py -v
 ```
 
+### Interactive Wizard
+```bash
+# Launch wizard (no arguments)
+python -m hero_image_generator
+
+# Wizard will prompt for inputs and show live preview
+# Config saved to ~/.config/hero-image-generator/last-used.json
+```
+
 ### Generate Images
 ```bash
 # Single image

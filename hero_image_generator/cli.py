@@ -193,6 +193,13 @@ Examples:
 
     args = parser.parse_args()
 
+    # Interactive wizard mode (no arguments)
+    if len(sys.argv) == 1:
+        from .wizard import WizardRunner
+        wizard = WizardRunner()
+        wizard.run()
+        return
+
     # Preview mode
     if args.preview:
         generate_preview_samples(output_dir=args.output_dir)
