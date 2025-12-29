@@ -6,7 +6,7 @@ def test_single_image():
 
     output = generator.generate(
         title="AI Agent Orchestration: Multi-Agent Workflows",
-        icon="🤖",
+        tags=['ai', 'agent', 'platform'],
         year=2025,
         output_filename="test-hero.png"
     )
