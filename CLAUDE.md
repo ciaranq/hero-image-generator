@@ -53,6 +53,31 @@ python -m hero_image_generator --metadata content.json
 python -m hero_image_generator --preview --output-dir ./my-images
 ```
 
+## Development Workflow
+
+**Branch Strategy:** Use regular git branches directly in the main repository. Do NOT use git worktrees for this project.
+
+**Task Management:** Use GitHub Issues to track features, bugs, and tasks. Create issues before starting new work and reference them in commits.
+
+**Feature Development:**
+```bash
+# Create feature branch from main
+git checkout -b feature/feature-name
+
+# Make changes, commit regularly
+git add .
+git commit -m "feat: description (#issue-number)"
+
+# Push and create PR
+git push -u origin feature/feature-name
+gh pr create
+```
+
+**Testing:** Always run full test suite before pushing:
+```bash
+pytest tests/ -v
+```
+
 ## Architecture
 
 ### Theme-Based Pipeline (image_generator.py:90-194)
