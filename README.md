@@ -25,6 +25,27 @@ pip install -e ".[dev]"
 
 ## Quick Start
 
+### Interactive Wizard (Recommended)
+
+Run without arguments to launch the interactive wizard:
+
+```bash
+python -m hero_image_generator
+```
+
+The wizard will:
+1. Prompt for title, tags, and year
+2. Auto-detect theme from tags
+3. Generate and preview the image
+4. Let you refine and regenerate until satisfied
+5. Save your preferences for next time
+
+Features:
+- Live preview in your default image viewer
+- Iterative refinement (change title, colors, fonts)
+- Auto-saved preferences between sessions
+- Color presets with custom hex/RGB support
+
 ### Generate a Single Image
 
 ```bash
