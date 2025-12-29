@@ -5,16 +5,16 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="hero-image-generator",
-    version="1.0.0",
+    version="1.1.0",
     author="IntelliAgent",
     author_email="contact@intelliagent.com.au",
-    description="Professional hero image generator with theme-based visual systems",
+    description="Professional hero image generator with theme-based visual systems and interactive CLI wizard",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/hero-image-generator",
+    url="https://github.com/ciaranq/hero-image-generator",
     packages=find_packages(),
     classifiers=[
-        "Development Status :: 4 - Beta",
+        "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Developers",
         "Topic :: Multimedia :: Graphics",
         "License :: OSI Approved :: MIT License",
