@@ -2,6 +2,7 @@
 Pillow>=10.0.0
 replicate>=0.25.0
 python-dotenv>=1.0.0
+google-cloud-aiplatform>=1.38.0
 
 # Development dependencies (optional)
 pytest>=7.4.0
