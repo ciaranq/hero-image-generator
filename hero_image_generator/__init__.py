@@ -10,7 +10,7 @@ from .subtitle_generator import SubtitleGenerator
 from .visual_renderer import VisualRenderer
 from .image_generator import HeroImageGenerator
 
-__version__ = "1.1.0"
+__version__ = "2.0.0"
 __all__ = [
     "HeroImageGenerator",
     "ThemeDetector",
