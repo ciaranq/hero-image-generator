@@ -11,5 +11,6 @@ from .config import AIConfig, ConfigurationError
 from .base import BaseAIModel, GenerationError
 from .flux import FluxModel
 from .gemini import GeminiModel
+from .cost_tracker import CostTracker
 
-__all__ = ['AIConfig', 'ConfigurationError', 'BaseAIModel', 'GenerationError', 'FluxModel', 'GeminiModel']
+__all__ = ['AIConfig', 'ConfigurationError', 'BaseAIModel', 'GenerationError', 'FluxModel', 'GeminiModel', 'CostTracker']
