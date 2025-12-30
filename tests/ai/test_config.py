@@ -29,6 +29,15 @@ def test_load_config_missing_replicate_token(monkeypatch):
         AIConfig.load()
 
 
+def test_load_config_missing_gcp_project_id(monkeypatch):
+    """Test config fails when GCP project ID is missing."""
+    monkeypatch.setenv('REPLICATE_API_TOKEN', 'test_token')
+    monkeypatch.delenv('GCP_PROJECT_ID', raising=False)
+
+    with pytest.raises(ConfigurationError, match='GCP_PROJECT_ID'):
+        AIConfig.load()
+
+
 def test_config_default_values(monkeypatch):
     """Test config uses sensible defaults."""
     monkeypatch.setenv('REPLICATE_API_TOKEN', 'test_token')
@@ -43,9 +52,8 @@ def test_config_default_values(monkeypatch):
     assert config.min_quality_score == 0.6
 
 
-def test_config_size_parsing():
+def test_config_size_parsing(monkeypatch):
     """Test image size parsing from strings."""
-    monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setenv('REPLICATE_API_TOKEN', 'test')
     monkeypatch.setenv('GCP_PROJECT_ID', 'test')
     monkeypatch.setenv('SIZE_SMALL', '800x450')
@@ -57,3 +65,33 @@ def test_config_size_parsing():
     assert config.size_small == (800, 450)
     assert config.size_medium == (1920, 1080)
     assert config.size_large == (2560, 1440)
+
+
+def test_config_invalid_size_format(monkeypatch):
+    """Test config fails with invalid size format."""
+    monkeypatch.setenv('REPLICATE_API_TOKEN', 'test')
+    monkeypatch.setenv('GCP_PROJECT_ID', 'test')
+    monkeypatch.setenv('SIZE_SMALL', 'invalid')
+
+    with pytest.raises(ConfigurationError, match='Invalid size format'):
+        AIConfig.load()
+
+
+def test_config_invalid_quality_score(monkeypatch):
+    """Test config fails with invalid quality score."""
+    monkeypatch.setenv('REPLICATE_API_TOKEN', 'test')
+    monkeypatch.setenv('GCP_PROJECT_ID', 'test')
+    monkeypatch.setenv('MIN_QUALITY_SCORE', 'not_a_number')
+
+    with pytest.raises(ConfigurationError, match='MIN_QUALITY_SCORE must be a number'):
+        AIConfig.load()
+
+
+def test_config_invalid_max_retries(monkeypatch):
+    """Test config fails with invalid max retries."""
+    monkeypatch.setenv('REPLICATE_API_TOKEN', 'test')
+    monkeypatch.setenv('GCP_PROJECT_ID', 'test')
+    monkeypatch.setenv('MAX_RETRIES', 'not_a_number')
+
+    with pytest.raises(ConfigurationError, match='MAX_RETRIES must be an integer'):
+        AIConfig.load()

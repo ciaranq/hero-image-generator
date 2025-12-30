@@ -93,7 +93,12 @@ class AIConfig:
         fallback_model = os.getenv('FALLBACK_MODEL', 'imagen')
 
         enable_qc = os.getenv('ENABLE_QUALITY_CHECK', 'true').lower() == 'true'
-        min_quality = float(os.getenv('MIN_QUALITY_SCORE', '0.6'))
+        try:
+            min_quality = float(os.getenv('MIN_QUALITY_SCORE', '0.6'))
+        except ValueError:
+            raise ConfigurationError(
+                f"MIN_QUALITY_SCORE must be a number, got: {os.getenv('MIN_QUALITY_SCORE')}"
+            )
 
         # Parse sizes
         size_small = cls._parse_size(os.getenv('SIZE_SMALL', '800x450'))
@@ -107,8 +112,19 @@ class AIConfig:
         log_costs = os.getenv('LOG_COSTS', 'true').lower() == 'true'
         cost_log = os.getenv('COST_LOG_FILE', 'generation_costs.log')
 
-        max_retries = int(os.getenv('MAX_RETRIES', '2'))
-        retry_delay = int(os.getenv('RETRY_DELAY_SECONDS', '5'))
+        try:
+            max_retries = int(os.getenv('MAX_RETRIES', '2'))
+        except ValueError:
+            raise ConfigurationError(
+                f"MAX_RETRIES must be an integer, got: {os.getenv('MAX_RETRIES')}"
+            )
+
+        try:
+            retry_delay = int(os.getenv('RETRY_DELAY_SECONDS', '5'))
+        except ValueError:
+            raise ConfigurationError(
+                f"RETRY_DELAY_SECONDS must be an integer, got: {os.getenv('RETRY_DELAY_SECONDS')}"
+            )
 
         return cls(
             replicate_api_token=replicate_token,
