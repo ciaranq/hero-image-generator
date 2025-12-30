@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 from .image_generator import HeroImageGenerator
+from .ai import AIConfig, FluxModel, GeminiModel, CostTracker, QualityValidator, GenerationError
 
 
 def generate_single_image(title, tags, year, output, output_dir=None):
@@ -154,13 +155,100 @@ def generate_preview_samples(output_dir=None):
     print(f"\nPreview images saved to: {generator.output_dir}/")
 
 
+def handle_ai_mode(args):
+    """Handle AI generation mode from CLI."""
+    if not args.prompt:
+        print('Error: --prompt is required when using --ai mode')
+        sys.exit(1)
+
+    try:
+        # Load config
+        config = AIConfig.load()
+
+        # Parse size
+        size_map = {
+            'small': config.size_small,
+            'medium': config.size_medium,
+            'large': config.size_large
+        }
+        size = size_map[args.size]
+
+        # Select model
+        model_name = args.model or 'flux-pro'
+        if model_name.startswith('flux'):
+            variant = model_name.split('-')[1]  # Extract 'pro', 'dev', 'schnell'
+            model = FluxModel(config, variant=variant)
+        else:  # imagen
+            model = GeminiModel(config, use_imagen=True)
+
+        # Initialize cost tracker
+        log_file = Path(config.cost_log_file) if config.log_costs else None
+        cost_tracker = CostTracker(log_file)
+
+        # Determine output path
+        output_path = Path(args.output) if args.output else Path(config.output_directory) / 'hero_image.png'
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Generate
+        print(f'Generating image with {model.name}...')
+        result_path = model.generate(
+            prompt=args.prompt,
+            size=size,
+            output_path=output_path
+        )
+
+        # Track cost
+        gen_cost = model.get_cost_per_image()
+        cost_tracker.track(
+            model=model.name,
+            cost=gen_cost,
+            status='success',
+            image_path=str(result_path),
+            size=size
+        )
+
+        print(f'✓ Image saved to: {result_path}')
+        print(f'💰 Cost: ${gen_cost:.3f}')
+
+        # Optional quality validation
+        if args.validate and config.enable_quality_check:
+            validator = QualityValidator(config)
+
+            print('Validating image quality...')
+            result = validator.validate(result_path, args.prompt)
+
+            cost_tracker.track(
+                model='validation',
+                cost=result.cost,
+                status='validated',
+                image_path=str(result_path),
+                size=size
+            )
+
+            if result.passed:
+                print(f'✓ Quality check passed (score: {result.score:.2f})')
+            else:
+                print(f'⚠ Quality check failed (score: {result.score:.2f})')
+                print(f'  Issues: {result.feedback}')
+
+        # Show cost summary
+        print('\n' + cost_tracker.display_summary())
+
+    except Exception as e:
+        print(f'Error: {e}')
+        sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Generate professional hero images with theme-based visual systems',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Generate single image
+  # AI mode - Generate with Flux/Gemini
+  %(prog)s --ai --prompt "Modern hero image for AI consultancy" --model flux-pro --size medium --output ai-hero.png
+
+  # Programmatic mode - Generate single image
   %(prog)s --title "My Blog Post" --tags ai,ml --year 2025 --output my-hero.png
 
   # Generate preview samples
@@ -174,7 +262,38 @@ Examples:
         """
     )
 
-    # Single image generation
+    # AI mode flags
+    parser.add_argument(
+        '--ai',
+        action='store_true',
+        help='Use AI generation (Flux/Gemini) instead of programmatic themes'
+    )
+    parser.add_argument(
+        '--prompt',
+        type=str,
+        help='AI generation prompt (required with --ai)'
+    )
+    parser.add_argument(
+        '--model',
+        type=str,
+        choices=['flux-pro', 'flux-dev', 'flux-schnell', 'imagen'],
+        help='AI model to use (default: flux-pro)'
+    )
+    parser.add_argument(
+        '--size',
+        type=str,
+        choices=['small', 'medium', 'large'],
+        default='medium',
+        help='Image size (default: medium)'
+    )
+    parser.add_argument(
+        '--validate',
+        action='store_true',
+        default=True,
+        help='Enable quality validation (default: enabled)'
+    )
+
+    # Programmatic mode - Single image generation
     parser.add_argument('--title', help='Image title text')
     parser.add_argument('--tags', help='Comma-separated tags for theme detection (e.g., ai,ml,platform)')
     parser.add_argument('--year', type=int, default=2025, help='Year for badge (default: 2025)')
@@ -198,6 +317,11 @@ Examples:
         from .wizard import WizardRunner
         wizard = WizardRunner()
         wizard.run()
+        return
+
+    # AI mode
+    if args.ai:
+        handle_ai_mode(args)
         return
 
     # Preview mode

@@ -19,14 +19,23 @@ pip install -e .
 
 ### Testing
 ```bash
-# Run all tests
-pytest tests/
+# Run all unit tests (no API calls)
+pytest tests/ -v -m "not slow"
+
+# Run all tests including integration tests (incurs API costs ~$0.04)
+pytest tests/ --run-slow -v
 
 # Run with coverage report
 pytest tests/ --cov=hero_image_generator --cov-report=html
 
 # Run specific test file
 pytest tests/test_theme_detector.py -v
+
+# Run only AI module unit tests
+pytest tests/ai/ -v
+
+# Run integration tests (real API calls)
+pytest tests/integration/ --run-slow -v
 ```
 
 ### Interactive Wizard
@@ -39,6 +48,8 @@ python -m hero_image_generator
 ```
 
 ### Generate Images
+
+#### Programmatic Mode (Theme-Based)
 ```bash
 # Single image
 python -m hero_image_generator --title "My Title" --tags ai,ml --year 2025 --output test.png
@@ -51,6 +62,21 @@ python -m hero_image_generator --metadata content.json
 
 # Custom output directory
 python -m hero_image_generator --preview --output-dir ./my-images
+```
+
+#### AI Mode (Flux/Gemini)
+```bash
+# Flux Schnell (fast, cheap)
+python -m hero_image_generator --ai --prompt "Epic tech hero image" --model flux-schnell
+
+# Flux Pro (highest quality)
+python -m hero_image_generator --ai --prompt "Professional conference hero" --model flux-pro --size large
+
+# Imagen with quality validation
+python -m hero_image_generator --ai --prompt "Modern workspace" --model imagen --validate
+
+# Custom output path
+python -m hero_image_generator --ai --prompt "AI agents platform" --model flux-dev --output my-hero.png
 ```
 
 ## Development Workflow
@@ -403,3 +429,462 @@ The wizard was built following a disciplined TDD approach:
 - Non-fatal preview errors for resilience
 - Preference persistence for UX continuity
 - Color preset system for ease of use
+
+## AI Integration (v2.0.0+)
+
+### Overview
+
+The AI module (`hero_image_generator/ai/`) adds support for generating hero images using external AI models (Flux via Replicate, Imagen/Gemini via Google Vertex AI) as an alternative to the programmatic theme-based system.
+
+### Architecture: Separate Modes
+
+The project uses a **dual-mode architecture** with mode selection upfront:
+
+1. **Mode Selection** - Wizard/CLI asks user to choose mode first
+2. **Separate Code Paths** - Each mode has independent implementation
+3. **Shared Infrastructure** - Both use same output handling and file management
+
+**Key Design Decision:** Separate modes prevent complexity of merging AI visuals with programmatic themes. User gets either theme-based OR AI-generated images, never hybrid.
+
+### AI Module Structure
+
+```
+hero_image_generator/ai/
+├── __init__.py           # Exports: AIConfig, FluxModel, GeminiModel, QualityValidator, CostTracker
+├── config.py             # Configuration loader from .env
+├── flux.py               # Flux model integration (Replicate API)
+├── gemini.py             # Imagen/Gemini integration (Vertex AI)
+├── cost_tracker.py       # Cost logging and session tracking
+└── quality_validator.py  # Quality validation with Gemini Vision
+```
+
+### AI Configuration (config.py:15-89)
+
+**Purpose:** Load and validate environment variables from `.env` file.
+
+**Environment Variables:**
+```bash
+# Required for Flux
+REPLICATE_API_TOKEN=r8_...
+
+# Required for Imagen/Gemini
+GCP_PROJECT_ID=your-project-id
+GCP_LOCATION=us-central1
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
+
+# Model Selection
+DEFAULT_MODEL=flux-pro
+FALLBACK_MODEL=flux-dev
+
+# Quality Validation
+ENABLE_QUALITY_CHECK=false
+MIN_QUALITY_SCORE=0.6
+
+# Image Sizes (WIDTHxHEIGHT)
+SIZE_SMALL=800x450
+SIZE_MEDIUM=1920x1080
+SIZE_LARGE=2560x1440
+
+# Output
+OUTPUT_DIRECTORY=public/images
+FAILED_OUTPUT_DIRECTORY=public/images/failed
+SAVE_FAILED_GENERATIONS=true
+
+# Cost Tracking
+LOG_COSTS=true
+COST_LOG_FILE=generation_costs.log
+
+# Retry Logic
+MAX_RETRIES=2
+RETRY_DELAY_SECONDS=5
+```
+
+**Loading:**
+```python
+from hero_image_generator.ai import AIConfig
+
+config = AIConfig.load()  # Loads from .env, validates required vars
+```
+
+**Validation:**
+- Raises `ConfigurationError` if required vars missing
+- Validates file paths exist (GOOGLE_APPLICATION_CREDENTIALS)
+- Parses size strings to tuples: "1920x1080" → (1920, 1080)
+
+**Test Coverage:** 100% (`tests/ai/test_config.py`)
+
+### Flux Model Integration (flux.py:12-134)
+
+**Purpose:** Generate images using Flux models via Replicate API.
+
+**Supported Variants:**
+- `flux-pro`: Highest quality ($0.055), ~6s
+- `flux-dev`: Production quality ($0.020), ~4s
+- `flux-schnell`: Fast drafts ($0.010), ~2s
+
+**Architecture:**
+```python
+class FluxModel:
+    VARIANT_CONFIG = {
+        'pro': {'model': 'black-forest-labs/flux-1.1-pro', 'cost': 0.055},
+        'dev': {'model': 'black-forest-labs/flux-dev', 'cost': 0.020},
+        'schnell': {'model': 'black-forest-labs/flux-schnell', 'cost': 0.010}
+    }
+
+    def generate(self, prompt: str, size: tuple, output_path: Path) -> Path:
+        # 1. Validate inputs
+        # 2. Call Replicate API via replicate.run()
+        # 3. Download image from URL
+        # 4. Save to output_path
+        # 5. Return path
+```
+
+**Retry Logic:**
+- Automatic retry on network/API failures (configurable: MAX_RETRIES, RETRY_DELAY_SECONDS)
+- Exponential backoff between retries
+- Failed generations saved to FAILED_OUTPUT_DIRECTORY if SAVE_FAILED_GENERATIONS=true
+
+**API Call:**
+```python
+output = replicate.run(
+    model_id,
+    input={
+        "prompt": prompt,
+        "width": size[0],
+        "height": size[1],
+        "num_outputs": 1
+    }
+)
+# Returns list of image URLs
+```
+
+**Test Coverage:** 100% unit tests (mocked), real API integration tests available with `--run-slow` flag
+
+### Gemini/Imagen Integration (gemini.py:12-121)
+
+**Purpose:** Generate images using Imagen via Google Vertex AI.
+
+**Model:** `imagegeneration@006` (stable, production-ready)
+
+**Cost:** $0.020 per generation
+
+**Architecture:**
+```python
+class GeminiModel:
+    def generate(self, prompt: str, size: tuple, output_path: Path) -> Path:
+        # 1. Initialize Vertex AI client
+        # 2. Load ImageGenerationModel
+        # 3. Generate image with prompt
+        # 4. Extract image bytes from response
+        # 5. Save to output_path
+        # 6. Return path
+```
+
+**API Initialization:**
+```python
+from google.cloud import aiplatform
+from vertexai.preview.vision_models import ImageGenerationModel
+
+aiplatform.init(project=config.gcp_project_id, location=config.gcp_location)
+model = ImageGenerationModel.from_pretrained('imagegeneration@006')
+```
+
+**Generation:**
+```python
+response = model.generate_images(
+    prompt=prompt,
+    number_of_images=1,
+    aspect_ratio="16:9"  # Closest to 1920x1080
+)
+image = response.images[0]._pil_image
+image.save(output_path)
+```
+
+**Limitations:**
+- No direct size control (uses aspect ratios: 1:1, 16:9, 9:16, 4:3, 3:4)
+- Generates at fixed resolution, may need resizing to exact dimensions
+
+**Test Coverage:** 100% unit tests (mocked), real API integration tests available with `--run-slow` flag
+
+### Quality Validator (quality_validator.py:12-93)
+
+**Purpose:** Validate generated images using Gemini Vision with structured JSON feedback.
+
+**Cost:** $0.001 per validation
+
+**Architecture:**
+```python
+class QualityValidator:
+    VALIDATION_COST = 0.001
+
+    def validate(self, image_path: Path, prompt: str) -> ValidationResult:
+        # 1. Load image as base64
+        # 2. Send to Gemini Vision with validation prompt
+        # 3. Parse JSON response
+        # 4. Return ValidationResult (score, passed, feedback, cost)
+```
+
+**Validation Prompt Template:**
+```
+You are evaluating the quality of a generated hero image (1200x630px or similar).
+
+Original prompt: {prompt}
+
+Evaluate on these criteria:
+1. Prompt Accuracy: Does it match the prompt?
+2. Composition: Professional layout, balanced, good use of space?
+3. Aesthetics: Visually appealing, color harmony, professional look?
+4. Technical Quality: Sharp, no artifacts, good resolution?
+
+Return JSON:
+{
+  "score": 0.0-1.0,
+  "breakdown": {
+    "prompt_accuracy": 0.0-1.0,
+    "composition": 0.0-1.0,
+    "aesthetics": 0.0-1.0,
+    "technical_quality": 0.0-1.0
+  },
+  "issues": ["list of problems"],
+  "strengths": ["list of strengths"],
+  "recommendation": "accept/regenerate"
+}
+```
+
+**ValidationResult:**
+```python
+@dataclass
+class ValidationResult:
+    score: float              # Overall score 0.0-1.0
+    passed: bool              # score >= MIN_QUALITY_SCORE
+    feedback: str             # Human-readable summary
+    cost: float = 0.001       # Validation cost
+    raw_response: Optional[Dict] = None  # Full JSON response
+```
+
+**Error Handling:**
+- Non-JSON responses: Extract text feedback, score=0.0
+- Missing image: Raise FileNotFoundError
+- API failures: Propagate with context
+
+**Test Coverage:** 100% (`tests/ai/test_quality_validator.py`)
+
+### Cost Tracker (cost_tracker.py:9-67)
+
+**Purpose:** Track and log API costs per session and cumulatively.
+
+**Architecture:**
+```python
+class CostTracker:
+    def __init__(self, log_file: Path, enabled: bool = True):
+        self.session_total = 0.0
+        self.log_file = log_file
+        self.enabled = enabled
+
+    def track(self, model: str, cost: float) -> None:
+        self.session_total += cost
+        if self.enabled:
+            self._log_to_file(model, cost)
+
+    def get_session_total(self) -> float:
+        return self.session_total
+```
+
+**Log Format:**
+```
+2025-12-30 14:32:15 - Model: flux-pro, Cost: $0.055, Total Session: $0.055
+2025-12-30 14:35:22 - Model: flux-schnell, Cost: $0.010, Total Session: $0.065
+2025-12-30 14:38:45 - Validation Cost: $0.001, Total Session: $0.066
+```
+
+**Usage:**
+```python
+from hero_image_generator.ai import CostTracker, AIConfig
+
+config = AIConfig.load()
+tracker = CostTracker(config.cost_log_file, enabled=config.log_costs)
+
+# After generation
+tracker.track('flux-pro', 0.055)
+
+# Get session total
+print(f"Session cost: ${tracker.get_session_total():.3f}")
+```
+
+**Test Coverage:** 100% (`tests/ai/test_cost_tracker.py`)
+
+### AI Wizard Integration (wizard/ai_wizard.py:13-246)
+
+**Purpose:** Interactive CLI wizard for AI mode with prompt collection and model selection.
+
+**Workflow:**
+1. Collect prompt from user
+2. Select model (Flux Pro/Dev/Schnell or Imagen)
+3. Select size (small/medium/large)
+4. Generate and preview
+5. Refinement loop:
+   - Regenerate with same settings
+   - Modify prompt
+   - Change model
+   - Change size
+6. Save final image
+
+**Refinement Menu:**
+```
+[1] Regenerate (same prompt/model/size)
+[2] Modify prompt
+[3] Change model
+[4] Change size
+[5] Start over
+[0] Save and exit
+```
+
+**Model Selection:**
+```
+Select AI model:
+[1] Flux Pro - Highest quality ($0.055)
+[2] Flux Dev - Production quality ($0.020)
+[3] Flux Schnell - Fast drafts ($0.010)
+[4] Imagen - Google Vertex AI ($0.020)
+```
+
+**Integration with Main Wizard:**
+- Main wizard asks mode selection first
+- If AI mode selected, delegates to AIWizardRunner
+- Separate code paths, no mode mixing
+
+**Test Coverage:** 90% (`tests/wizard/test_ai_wizard.py`)
+
+### CLI Integration (cli.py:250-320)
+
+**AI Mode Detection:**
+```python
+if args.ai:
+    handle_ai_mode(args)
+    return
+```
+
+**AI Mode Handler:**
+```python
+def handle_ai_mode(args):
+    # 1. Load config
+    config = AIConfig.load()
+
+    # 2. Initialize cost tracker
+    tracker = CostTracker(config.cost_log_file, config.log_costs)
+
+    # 3. Select model
+    if args.model == 'imagen':
+        model = GeminiModel(config)
+    else:
+        model = FluxModel(config, variant=args.model.split('-')[1])
+
+    # 4. Parse size
+    size = config.size_presets[args.size]
+
+    # 5. Generate
+    result = model.generate(prompt=args.prompt, size=size, output_path=output_path)
+
+    # 6. Track cost
+    tracker.track(args.model, model.get_cost())
+
+    # 7. Optional validation
+    if args.validate and config.enable_quality_check:
+        validator = QualityValidator(config)
+        validation = validator.validate(result, args.prompt)
+        tracker.track('validation', validation.cost)
+
+    # 8. Display summary
+    print(f"Generated: {result}")
+    print(f"Cost: ${tracker.get_session_total():.3f}")
+```
+
+**Test Coverage:** 100% (`tests/test_cli.py`)
+
+### Testing Strategy
+
+**Unit Tests (Mocked APIs):**
+- All AI module tests use mocks to avoid API costs
+- Mock `replicate.run()` for Flux tests
+- Mock `GenerativeModel` for Gemini tests
+- 100% coverage for all AI modules
+
+**Integration Tests (Real APIs):**
+- Located in `tests/integration/`
+- Require `--run-slow` flag to run
+- Make real API calls (incur costs ~$0.04 per full run)
+- Test full end-to-end workflows
+
+**Pytest Markers:**
+```python
+@pytest.mark.slow              # Requires --run-slow flag
+@pytest.mark.requires_api_keys # Needs real API credentials
+@pytest.mark.integration       # Integration test
+```
+
+**Run Commands:**
+```bash
+# Unit tests only (free, fast)
+pytest tests/ai/ -v
+
+# All tests including integration (costs ~$0.04)
+pytest tests/ --run-slow -v
+
+# Only Flux integration tests
+pytest tests/integration/test_flux_integration.py --run-slow -v
+```
+
+**Test Fixtures:**
+```python
+@pytest.fixture
+def real_config():
+    """Load real config from .env for integration tests"""
+    return AIConfig.load()
+
+@pytest.fixture
+def mock_config():
+    """Mock config for unit tests"""
+    config = MagicMock()
+    config.replicate_api_token = "test_token"
+    config.gcp_project_id = "test-project"
+    # ... all attributes
+    return config
+```
+
+### Key Constraints
+
+- **API Costs:** All generations incur real costs - track carefully
+- **Rate Limits:** Replicate (50 concurrent, 600/min), Vertex AI (60/min)
+- **No Fallback Between Modes:** User must explicitly choose programmatic OR AI
+- **Quality Validation:** Requires GCP setup even if using only Flux models
+- **Image Sizes:** AI models may not support exact dimensions, may require resizing
+- **Retry Logic:** Automatic retries on failures to handle transient errors
+
+### Extending AI Support
+
+To add new AI providers:
+
+1. Create new model class in `hero_image_generator/ai/` (e.g., `openai.py`)
+2. Implement `generate(prompt, size, output_path)` method
+3. Add cost constant and tracking
+4. Update `AIConfig` with new provider env vars
+5. Add to wizard model selection menu
+6. Add CLI flag support
+7. Write unit tests with mocks
+8. Write integration test with `@pytest.mark.slow`
+9. Update documentation (README, CLAUDE.md, setup guides)
+
+Example template:
+```python
+class NewProviderModel:
+    def __init__(self, config: AIConfig):
+        self.api_key = config.new_provider_api_key
+        self.cost_per_image = 0.03  # Example cost
+
+    def generate(self, prompt: str, size: tuple, output_path: Path) -> Path:
+        # Implementation
+        return output_path
+
+    def get_cost(self) -> float:
+        return self.cost_per_image
+```
