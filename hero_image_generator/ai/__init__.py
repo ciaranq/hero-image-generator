@@ -9,5 +9,6 @@ This module provides AI-generated hero images using:
 
 from .config import AIConfig, ConfigurationError
 from .base import BaseAIModel, GenerationError
+from .flux import FluxModel
 
-__all__ = ['AIConfig', 'ConfigurationError', 'BaseAIModel', 'GenerationError']
+__all__ = ['AIConfig', 'ConfigurationError', 'BaseAIModel', 'GenerationError', 'FluxModel']
