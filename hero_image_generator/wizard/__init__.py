@@ -34,7 +34,22 @@ class WizardRunner:
     def run(self) -> None:
         """Run the interactive wizard."""
         try:
-            print("\n🎨 Hero Image Generator - Interactive Wizard\n")
+            print('\n' + '=' * 60)
+            print('Hero Image Generator')
+            print('=' * 60)
+
+            # Mode selection
+            mode = self._select_mode()
+
+            if mode == 'ai':
+                # Delegate to AI wizard
+                from .ai_wizard import AIWizardRunner
+                ai_wizard = AIWizardRunner()
+                ai_wizard.run()
+                return
+
+            # Programmatic mode continues below
+            print("\n🎨 Programmatic Theme Generator\n")
 
             # Load saved preferences
             self.config = self.config_manager.load()
@@ -72,6 +87,27 @@ class WizardRunner:
         except KeyboardInterrupt:
             print("\n\n👋 Wizard cancelled\n")
             return
+
+    def _select_mode(self) -> str:
+        """Let user select generation mode.
+
+        Returns:
+            'programmatic' or 'ai'
+        """
+        print('\n🎨 How would you like to generate your hero image?')
+        print('1. Programmatic themes (AI/ML, SEO, Automation, Strategy)')
+        print('2. AI-generated (Flux/Gemini photorealistic images)')
+        print()
+
+        while True:
+            choice = input('Select mode [1-2]: ').strip()
+
+            if choice == '1':
+                return 'programmatic'
+            elif choice == '2':
+                return 'ai'
+            else:
+                print('Invalid choice. Please enter 1 or 2.')
 
     def _collect_initial_inputs(self) -> None:
         """Collect initial user inputs."""
