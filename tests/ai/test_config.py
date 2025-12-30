@@ -1,10 +1,26 @@
 """Tests for AI configuration management."""
 import os
 import pytest
+from unittest.mock import patch
 from hero_image_generator.ai.config import AIConfig, ConfigurationError
 
 
-def test_load_config_with_all_env_vars(monkeypatch):
+def clear_all_env_vars(monkeypatch):
+    """Clear all AI-related environment variables for test isolation."""
+    env_vars = [
+        'REPLICATE_API_TOKEN', 'GCP_PROJECT_ID', 'GCP_LOCATION',
+        'GOOGLE_APPLICATION_CREDENTIALS', 'DEFAULT_MODEL', 'FALLBACK_MODEL',
+        'ENABLE_QUALITY_CHECK', 'MIN_QUALITY_SCORE', 'SIZE_SMALL',
+        'SIZE_MEDIUM', 'SIZE_LARGE', 'OUTPUT_DIRECTORY', 'FAILED_OUTPUT_DIRECTORY',
+        'SAVE_FAILED_GENERATIONS', 'LOG_COSTS', 'COST_LOG_FILE',
+        'MAX_RETRIES', 'RETRY_DELAY_SECONDS'
+    ]
+    for var in env_vars:
+        monkeypatch.delenv(var, raising=False)
+
+
+@patch('hero_image_generator.ai.config.load_dotenv')
+def test_load_config_with_all_env_vars(mock_load_dotenv, monkeypatch):
     """Test loading config when all env vars are present."""
     monkeypatch.setenv('REPLICATE_API_TOKEN', 'test_token')
     monkeypatch.setenv('GCP_PROJECT_ID', 'test_project')
@@ -21,25 +37,29 @@ def test_load_config_with_all_env_vars(monkeypatch):
     assert config.fallback_model == 'imagen'
 
 
-def test_load_config_missing_replicate_token(monkeypatch):
+@patch('hero_image_generator.ai.config.load_dotenv')
+def test_load_config_missing_replicate_token(mock_load_dotenv, monkeypatch):
     """Test config fails when Replicate token is missing."""
-    monkeypatch.delenv('REPLICATE_API_TOKEN', raising=False)
+    clear_all_env_vars(monkeypatch)
 
     with pytest.raises(ConfigurationError, match='REPLICATE_API_TOKEN'):
         AIConfig.load()
 
 
-def test_load_config_missing_gcp_project_id(monkeypatch):
+@patch('hero_image_generator.ai.config.load_dotenv')
+def test_load_config_missing_gcp_project_id(mock_load_dotenv, monkeypatch):
     """Test config fails when GCP project ID is missing."""
+    clear_all_env_vars(monkeypatch)
     monkeypatch.setenv('REPLICATE_API_TOKEN', 'test_token')
-    monkeypatch.delenv('GCP_PROJECT_ID', raising=False)
 
     with pytest.raises(ConfigurationError, match='GCP_PROJECT_ID'):
         AIConfig.load()
 
 
-def test_config_default_values(monkeypatch):
+@patch('hero_image_generator.ai.config.load_dotenv')
+def test_config_default_values(mock_load_dotenv, monkeypatch):
     """Test config uses sensible defaults."""
+    clear_all_env_vars(monkeypatch)
     monkeypatch.setenv('REPLICATE_API_TOKEN', 'test_token')
     monkeypatch.setenv('GCP_PROJECT_ID', 'test_project')
 
@@ -52,8 +72,10 @@ def test_config_default_values(monkeypatch):
     assert config.min_quality_score == 0.6
 
 
-def test_config_size_parsing(monkeypatch):
+@patch('hero_image_generator.ai.config.load_dotenv')
+def test_config_size_parsing(mock_load_dotenv, monkeypatch):
     """Test image size parsing from strings."""
+    clear_all_env_vars(monkeypatch)
     monkeypatch.setenv('REPLICATE_API_TOKEN', 'test')
     monkeypatch.setenv('GCP_PROJECT_ID', 'test')
     monkeypatch.setenv('SIZE_SMALL', '800x450')
@@ -67,8 +89,10 @@ def test_config_size_parsing(monkeypatch):
     assert config.size_large == (2560, 1440)
 
 
-def test_config_invalid_size_format(monkeypatch):
+@patch('hero_image_generator.ai.config.load_dotenv')
+def test_config_invalid_size_format(mock_load_dotenv, monkeypatch):
     """Test config fails with invalid size format."""
+    clear_all_env_vars(monkeypatch)
     monkeypatch.setenv('REPLICATE_API_TOKEN', 'test')
     monkeypatch.setenv('GCP_PROJECT_ID', 'test')
     monkeypatch.setenv('SIZE_SMALL', 'invalid')
@@ -77,8 +101,10 @@ def test_config_invalid_size_format(monkeypatch):
         AIConfig.load()
 
 
-def test_config_invalid_quality_score(monkeypatch):
+@patch('hero_image_generator.ai.config.load_dotenv')
+def test_config_invalid_quality_score(mock_load_dotenv, monkeypatch):
     """Test config fails with invalid quality score."""
+    clear_all_env_vars(monkeypatch)
     monkeypatch.setenv('REPLICATE_API_TOKEN', 'test')
     monkeypatch.setenv('GCP_PROJECT_ID', 'test')
     monkeypatch.setenv('MIN_QUALITY_SCORE', 'not_a_number')
@@ -87,8 +113,10 @@ def test_config_invalid_quality_score(monkeypatch):
         AIConfig.load()
 
 
-def test_config_invalid_max_retries(monkeypatch):
+@patch('hero_image_generator.ai.config.load_dotenv')
+def test_config_invalid_max_retries(mock_load_dotenv, monkeypatch):
     """Test config fails with invalid max retries."""
+    clear_all_env_vars(monkeypatch)
     monkeypatch.setenv('REPLICATE_API_TOKEN', 'test')
     monkeypatch.setenv('GCP_PROJECT_ID', 'test')
     monkeypatch.setenv('MAX_RETRIES', 'not_a_number')
